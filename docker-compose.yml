@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: pathfinder-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: pathfinder
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  jupyter:
+    image: jupyter/scipy-notebook:2024-04-17
+    container_name: pathfinder-notebook
+    restart: unless-stopped
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=pathfinder
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - ACLED_TOKEN=${ACLED_TOKEN}      # read from .env
+      - TZ=UTC
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./:/home/jovyan/work
+    depends_on:
+      - db
+
+volumes:
+  db_data:
