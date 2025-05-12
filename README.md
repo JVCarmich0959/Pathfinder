@@ -12,6 +12,6 @@ and aid convoys.
 
 ```bash
 # clone & spin up complete stack
-git clone https://github.com/<your-user>/pathfinder.git
+git clone https://github.com/JVCarmichael0959/pathfinder.git
 cd pathfinder
 docker compose up      # PostGIS + pgRouting + Jupyter + Flask
