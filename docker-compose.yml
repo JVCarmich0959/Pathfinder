@@ -1,4 +1,4 @@
-version: "3.8"
+
 
 services:
   db:
@@ -15,9 +15,12 @@ services:
       - db_data:/var/lib/postgresql/data
 
   jupyter:
-    image: jupyter/scipy-notebook:2024-04-17
+    image: jupyter/scipy-notebook:latest 
     container_name: pathfinder-notebook
     restart: unless-stopped
+
+    env_file:
+      - .env
     environment:
       - JUPYTER_ENABLE_LAB=yes
       - POSTGRES_HOST=db
@@ -25,6 +28,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - ACLED_TOKEN=${ACLED_TOKEN}      # read from .env
+      - ACLED_EMAIL=${ACLED_EMAIL}      # read from .env
       - TZ=UTC
     ports:
       - "8888:8888"
