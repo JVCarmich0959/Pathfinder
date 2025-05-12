@@ -1,4 +1,17 @@
 # Pathfinder
-Risk-aware, offline maps and routing tools for Sudan-Chad humanitarian aid
 
-Open-source pipeline that fuses satelite,conflct & OSM data to publish daily safe-route layers (GeoJSON,MBTiles,PDFs)for refugees and aid convoys.
+Risk-aware, offline-friendly maps and routing tools for Sudan–Chad
+humanitarian operations. Pathfinder fuses fresh satellite imagery,
+OpenStreetMap edits, and conflict-event data to publish daily safe-route
+layers (GeoJSON, MBTiles, printable PDFs) for refugees, local drivers,
+and aid convoys.
+
+---
+
+## Quick start (tech)
+
+```bash
+# clone & spin up complete stack
+git clone https://github.com/<your-user>/pathfinder.git
+cd pathfinder
+docker compose up      # PostGIS + pgRouting + Jupyter + Flask
