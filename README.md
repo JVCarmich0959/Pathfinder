@@ -4,7 +4,7 @@ Risk-aware, offline-friendly maps and routing tools for Sudan–Chad
 humanitarian operations. Pathfinder fuses fresh satellite imagery,
 OpenStreetMap edits, and conflict-event data to publish daily safe-route
 layers (GeoJSON, MBTiles, printable PDFs) for refugees, local drivers,
-and aid convoys.
+
 
 ---
 ## Data license
@@ -15,6 +15,8 @@ and aid convoys.
   required.
 * **Satellite imagery** © Planet Labs PBC (NICFI program). Redistribution of
   raw imagery is prohibited; derived vector layers released as CC-BY-SA 4.0.
+
+
 
 ## Quick start (tech)
 
