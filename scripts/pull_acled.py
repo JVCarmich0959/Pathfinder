@@ -26,10 +26,8 @@ args = [a for a in args if a != "--list"]
 # ---------------------------------------------------------------------------
 # 1. ENV – token & email
 # ---------------------------------------------------------------------------
-TOKEN = os.getenv("ACLED_TOKEN")
-EMAIL = os.getenv("ACLED_EMAIL")
-if not TOKEN or not EMAIL:
-    sys.exit("\n❌  ACLED_TOKEN and/or ACLED_EMAIL missing in environment.\n")
+TOKEN = "q9r3nnIp-RGUjepLFxk-1234"
+EMAIL = "jvictoriacarmichael@gmail.com"
 
 # ---------------------------------------------------------------------------
 # 2. Fetch / cache ISO table

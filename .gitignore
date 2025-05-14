@@ -1,0 +1,6 @@
+
+# raw binaries
+data/raw/*.zip
+data/raw/*.gpkg
+data/raw/*.xlsx
+.env
