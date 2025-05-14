@@ -26,4 +26,14 @@ git clone https://github.com/JVCarmichael0959/pathfinder.git
 cd pathfinder
 docker compose up      # PostGIS + pgRouting + Jupyter + Flask
 
+## Data ingest (raw ➜ PostGIS)
+
+| script | purpose | example call |
+|--------|---------|--------------|
+| `scripts/pull_acled.py` | Pull ACLED events for one or more countries/regions (14-day window by default) | `python scripts/pull_acled.py Sudan Chad` |
+| `scripts/fetch_hdx_sa_monthly.py` | South-Africa monthly aggregates (events & fatalities) → CSV + PostGIS | `python scripts/fetch_hdx_sa_monthly.py "<HDX-xlsx-URL>"` |
+| `scripts/fetch_hdx_sudan_roads.py` | HOT-OSM Sudan roads export (ZIP) → GPKG + PostGIS | `python scripts/fetch_hdx_sudan_roads.py "<roads-zip-URL>"` |
+
+All three write raw files to **`data/raw/`** and populate the corresponding PostGIS tables inside the `db` container (`events_raw`, `sa_monthly_violence`, `sudan_roads_osm`).
+
 
