@@ -3,7 +3,7 @@ name: HDX nightly refresh
 on:
   workflow_dispatch:
   schedule:
-    - cron: '27 3 * * *'      # 03:27 UTC daily
+    - cron: '27 3 * * *'
 
 jobs:
   refresh:
@@ -22,29 +22,28 @@ jobs:
         ports: ['5432:5432']
         options: >-
           --health-cmd "pg_isready -U postgres"
-          --health-interval 5s --health-timeout 5s --health-retries 12
+          --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+        with: {python-version: '3.12'}
 
-      - name: Install Python deps
+      - name: Install system psql client
+        run: sudo apt-get update && sudo apt-get -y install postgresql-client
+
+      - name: Install Python dependencies
         run: pip install -r requirements.txt
 
-      # ── apply schema using the same SQLAlchemy URL the loader will use
-      - name: Initialize staging + clean tables
+      - name: Initialise schema (staging + clean)
+        working-directory: ${{ github.workspace }}
+        env:
+          PGPASSWORD: postgres
         run: |
-          python - <<'PY'
-          import os, pathlib, sqlalchemy
-          engine = sqlalchemy.create_engine(os.environ["DATABASE_URL"])
-          sql    = pathlib.Path("sql/02_staging_clean.sql").read_text()
-          with engine.begin() as conn:
-              conn.exec_driver_sql(sql)
-          print("✅  schema applied")
-          PY
+          set -e
+          psql --set ON_ERROR_STOP=1 -h localhost -U postgres -d pathfinder \
+               -f sql/02_staging_clean.sql
 
       - name: Fetch newest HDX workbook
         run: bash scripts/fetch_hdx_pv.sh
