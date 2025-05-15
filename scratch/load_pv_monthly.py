@@ -17,7 +17,7 @@ DB_URL = os.getenv(
     "postgresql://postgres:postgres@db:5432/pathfinder"  # ← works in docker-compose
 )
 
-engine = create_engine(DB_URL)
+#engine = create_engine(DB_URL)
 # ── 1. Locate the newest Sudan workbook ──────────────────────────────
 candidates = list(
     itertools.chain(
