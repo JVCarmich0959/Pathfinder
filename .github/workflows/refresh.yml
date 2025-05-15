@@ -1,15 +1,14 @@
 name: HDX nightly refresh
 
 on:
-  workflow_dispatch:              # manual trigger
+  workflow_dispatch:
   schedule:
-    - cron: '27 3 * * *'          # 03 :27 UTC every day
+    - cron: '27 3 * * *'      # 03:27 UTC daily
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
 
-    # All steps inherit this -> loader connects to localhost
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathfinder
 
@@ -23,30 +22,29 @@ jobs:
         ports: ['5432:5432']
         options: >-
           --health-cmd "pg_isready -U postgres"
-          --health-interval 10s --health-timeout 5s --health-retries 5
+          --health-interval 5s --health-timeout 5s --health-retries 12
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      # ── NEW: psql client so we can run the DDL
-      - name: Install system psql client
-        run: sudo apt-get update && sudo apt-get -y install postgresql-client
-
-      # ── NEW: apply schema (creates acled_monthly_staging & clean)
-      - name: Initialize schema (staging + clean)
-        env:
-          PGPASSWORD: postgres
-        run: |
-          psql -h localhost -U postgres -d pathfinder -f sql/02_staging_clean.sql
-
-      - name: Install Python dependencies
+      - name: Install Python deps
         run: pip install -r requirements.txt
+
+      # ── apply schema using the same SQLAlchemy URL the loader will use
+      - name: Initialize staging + clean tables
+        run: |
+          python - <<'PY'
+          import os, pathlib, sqlalchemy
+          engine = sqlalchemy.create_engine(os.environ["DATABASE_URL"])
+          sql    = pathlib.Path("sql/02_staging_clean.sql").read_text()
+          with engine.begin() as conn:
+              conn.exec_driver_sql(sql)
+          print("✅  schema applied")
+          PY
 
       - name: Fetch newest HDX workbook
         run: bash scripts/fetch_hdx_pv.sh
