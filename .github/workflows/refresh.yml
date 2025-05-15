@@ -1,14 +1,15 @@
 name: HDX nightly refresh
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:              # manual trigger
   schedule:
-    - cron: '27 3 * * *'        # 03:27 UTC daily
+    - cron: '27 3 * * *'          # 03 :27 UTC every day
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
 
+    # All steps inherit this -> loader connects to localhost
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathfinder
 
@@ -25,13 +26,26 @@ jobs:
           --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install deps
+      # ── NEW: psql client so we can run the DDL
+      - name: Install system psql client
+        run: sudo apt-get update && sudo apt-get -y install postgresql-client
+
+      # ── NEW: apply schema (creates acled_monthly_staging & clean)
+      - name: Initialize schema (staging + clean)
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d pathfinder -f sql/02_staging_clean.sql
+
+      - name: Install Python dependencies
         run: pip install -r requirements.txt
 
       - name: Fetch newest HDX workbook
