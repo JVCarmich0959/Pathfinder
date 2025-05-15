@@ -19,6 +19,12 @@ DB_URL = os.getenv(
 print("📡  DB_URL =", DB_URL)        # will show in CI log
 engine = create_engine(DB_URL)
 
+# ── bootstrap schema if missing ─────────────────────────────────
+DDL = Path(ROOT / "sql/02_staging_clean.sql").read_text()
+with engine.begin() as conn:
+    conn.exec_driver_sql(DDL)
+print("🔑  ensured staging / clean tables exist")
+
 # ── locate newest workbook ─────────────────────────────────────
 candidates = list(itertools.chain(
     RAW.glob("sudan*_pv_*xlsx"),
