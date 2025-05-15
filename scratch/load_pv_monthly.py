@@ -1,58 +1,109 @@
 #!/usr/bin/env python3
-from pathlib import Path
-import os, itertools, pandas as pd, sqlalchemy as sa
+"""
+load_pv_monthly.py  –  HDX Sudan workbook  ➜  raw ➜ staging ➜ clean
+Self-contained: creates missing tables every run, works in Docker or CI.
+"""
 
-ROOT = Path(__file__).resolve().parents[1]
+from pathlib import Path
+import os, itertools, pandas as pd
+import sqlalchemy as sa
+
+# ────────────────────────────────────────────────────────────────
+# 0.  Paths & database URL
+# ────────────────────────────────────────────────────────────────
+ROOT = Path(__file__).resolve().parents[1]          # …/Pathfinder
 RAW_DIR = ROOT / "data" / "raw"
-DB_URL = os.getenv("DATABASE_URL",
-                   "postgresql://postgres:postgres@db:5432/pathfinder")
+
+DB_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:postgres@db:5432/pathfinder",  # docker-compose default
+)
 print("📡  DB_URL =", DB_URL)
+
 engine = sa.create_engine(DB_URL)
 
-# ── locate newest workbook ──────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────
+# 1.  Locate newest workbook
+# ────────────────────────────────────────────────────────────────
 candidates = list(itertools.chain(
     RAW_DIR.glob("sudan*_pv_*xlsx"),
     RAW_DIR.glob("sudan_hrp_*violence*xlsx"),
 ))
+if not candidates:
+    raise FileNotFoundError(f"No Sudan HDX workbook found in {RAW_DIR}")
+
 wb_path = max(candidates, key=lambda p: p.stat().st_mtime)
 print("👉  reading", wb_path.relative_to(ROOT))
 
-# ── read the first sheet that has a Month column ────────────────────
+# ────────────────────────────────────────────────────────────────
+# 2.  Read the sheet that contains a 'Month' column
+# ────────────────────────────────────────────────────────────────
 for sheet in pd.ExcelFile(wb_path).sheet_names:
     df = pd.read_excel(wb_path, sheet_name=sheet, dtype=str)
     if "Month" in df.columns:
         break
 else:
-    raise ValueError("No sheet with a 'Month' column found")
+    raise ValueError("No sheet with a 'Month' column found!")
 
-# ── tidy dataframe ──────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────
+# 3.  Tidy dataframe
+# ────────────────────────────────────────────────────────────────
 df = (df.rename(columns={
-        "Month":"event_month","Year":"event_year",
-        "Admin1":"admin1","Admin2":"admin2",
-        "Events":"events","Fatalities":"fatalities"})
-      [["event_month","event_year","admin1","admin2","events","fatalities"]]
+        "Month": "event_month", "Year": "event_year",
+        "Admin1": "admin1",     "Admin2": "admin2",
+        "Events": "events",     "Fatalities": "fatalities",
+    })[["event_month","event_year","admin1","admin2","events","fatalities"]]
       .assign(month_start=lambda d:
-              pd.to_datetime(d.event_month.str[:3]+" "+d.event_year,
+              pd.to_datetime(d.event_month.str[:3] + " " + d.event_year,
                              format="%b %Y"))
       .astype({"events":"Int64","fatalities":"Int64","event_year":"int"}))
 print(df.head())
 
+# ────────────────────────────────────────────────────────────────
+# 4.  Insert / replace raw table  (must come *before* DDL below)
+# ────────────────────────────────────────────────────────────────
+df.to_sql("acled_monthly_raw", engine,
+          if_exists="replace", index=False, method="multi")
+print(f"✅  inserted {len(df):,} rows into acled_monthly_raw")
+
+# ────────────────────────────────────────────────────────────────
+# 5.  Ensure staging & clean tables exist (DDL runs after raw exists)
+# ────────────────────────────────────────────────────────────────
+ddl_sql = (ROOT / "sql" / "02_staging_clean.sql").read_text()
 with engine.begin() as conn:
-    # 1️⃣ load / replace raw ----------------------------------------
-    df.to_sql("acled_monthly_raw", conn,
-              if_exists="replace", index=False, method="multi")
-    print(f"✅  inserted {len(df):,} rows into acled_monthly_raw")
+    conn.exec_driver_sql(ddl_sql)
+print("🔑  ensured staging & clean tables exist")
 
-    # 2️⃣ ensure staging & clean exist ------------------------------
-    ddl = Path(ROOT/"sql/02_staging_clean.sql").read_text()
-    conn.exec_driver_sql(ddl)
-    print("🔑  ensured staging + clean tables exist")
+# ────────────────────────────────────────────────────────────────
+# 6.  staging ➜ clean upsert
+# ────────────────────────────────────────────────────────────────
+UPSERT_SQL = """
+INSERT INTO acled_monthly_staging (event_month,event_year,admin1,admin2,
+                                   events,fatalities,month_start)
+SELECT event_month,event_year,admin1,admin2,events,fatalities,month_start
+FROM   acled_monthly_raw
+ON CONFLICT DO NOTHING;
 
-    # 3️⃣ staging ➜ clean upsert ------------------------------------
-    UPSERT_SQL = """
-    INSERT INTO acled_monthly_staging (...)
-    -- (same UPSERT block as before)
-    """
+UPDATE acled_monthly_staging s SET
+  _row_hash = md5(concat_ws('‖',s.event_month,
+                                 s.event_year::text,
+                                 s.admin2,
+                                 coalesce(s.fatalities,0)::text))
+WHERE _row_hash IS NULL;
+
+INSERT INTO acled_monthly_clean (event_month,event_year,admin1,admin2,
+                                 events,fatalities,month_start,_loaded_at)
+SELECT DISTINCT ON (_row_hash)
+       event_month,event_year,admin1,admin2,
+       events,fatalities,month_start,_loaded_at
+FROM   acled_monthly_staging
+ORDER  BY _row_hash,_loaded_at DESC
+ON CONFLICT DO NOTHING;
+
+DELETE FROM acled_monthly_staging
+WHERE _loaded_at < NOW() - INTERVAL '30 days';
+"""
+with engine.begin() as conn:
     conn.exec_driver_sql(UPSERT_SQL)
 
 print("🎉  staging→clean sync complete")
