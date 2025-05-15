@@ -7,12 +7,17 @@ Run me from anywhere: host shell, jupyter container, or CI.
 from pathlib import Path
 import itertools, pandas as pd
 from sqlalchemy import create_engine
+import os
 
 # ── 0. Repo-relative paths ───────────────────────────────────────────
 ROOT   = Path(__file__).resolve().parents[1]        # …/Pathfinder
 RAW    = ROOT / "data" / "raw"                      # …/data/raw
-DB_URL = "postgresql://postgres:postgres@db:5432/pathfinder"
+DB_URL = os.getenv(
+    "DATABASE_URL",           # ← override in CI
+    "postgresql://postgres:postgres@db:5432/pathfinder"  # ← works in docker-compose
+)
 
+engine = create_engine(DB_URL)
 # ── 1. Locate the newest Sudan workbook ──────────────────────────────
 candidates = list(
     itertools.chain(
