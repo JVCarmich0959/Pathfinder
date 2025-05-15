@@ -13,11 +13,12 @@ import os
 ROOT   = Path(__file__).resolve().parents[1]        # …/Pathfinder
 RAW    = ROOT / "data" / "raw"                      # …/data/raw
 DB_URL = os.getenv(
-    "DATABASE_URL",           # ← override in CI
-    "postgresql://postgres:postgres@db:5432/pathfinder"  # ← works in docker-compose
+    "DATABASE_URL",
+    "postgresql://postgres:postgres@db:5432/pathfinder",   # default for docker-compose
 )
+print("📡  using DB_URL =", DB_URL)  
 
-#engine = create_engine(DB_URL)
+engine = create_engine(DB_URL)
 # ── 1. Locate the newest Sudan workbook ──────────────────────────────
 candidates = list(
     itertools.chain(
@@ -64,7 +65,7 @@ df = (
 print(df.head())
 
 # ── 4. Load into Postgres (raw table replaced each run) ──────────────
-engine = create_engine(DB_URL)
+
 df.to_sql("acled_monthly_raw", engine, if_exists="replace",
           index=False, method="multi")
 print(f"✅  inserted {len(df):,} rows into acled_monthly_raw")

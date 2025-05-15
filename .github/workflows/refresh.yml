@@ -1,43 +1,42 @@
 name: HDX nightly refresh
 
 on:
+  workflow_dispatch:            # manual trigger
   schedule:
-    - cron: '27 3 * * *'     # 03:27 UTC ≈ 11:27 PM EDT
-  workflow_dispatch:         # ← lets you run it manually from the Actions tab
+    - cron: '27 3 * * *'        # 03:27 UTC every day
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
 
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathfinder
+
     services:
-      postgres:
+      db:
         image: postgis/postgis:16-3.4
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: pathfinder
-        ports: ['5432:5432']
+        ports:
+          - 5432:5432
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-    - name: Install project dependencies
-      run: |
-        pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-    - name: Fetch newest HDX workbook
-      run: bash scripts/fetch_hdx_pv.sh
+      - name: Fetch newest HDX workbook
+        run: bash scripts/fetch_hdx_pv.sh
 
-    - name: Run ETL loader
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathfinder
-      run: python scratch/load_pv_monthly.py
+      - name: Run ETL loader
+        run: python scratch/load_pv_monthly.py
