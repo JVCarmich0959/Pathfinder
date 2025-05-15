@@ -1,9 +1,13 @@
-psycopg2-binary==2.9.9
-SQLAlchemy==2.0.23
-geopandas==0.14.3
-ipyleaflet==0.18.2
-python-dotenv==1.0.1
-psycopg2==2.9.9
-psycopg2-binary==2.9.10 git add requirements.txt scripts/fetch_hdx_sa_monthly.py git commit -m Add Postgres driver + SA ingest tweaks git push
-psychopg2-binary==2.9.9
+# ── core ───────────────────────────────────────────────
+pandas>=2.2
+sqlalchemy>=2.0
+psycopg2-binary>=2.9
+openpyxl>=3.1
+
+# ── geo / viz (already working) ────────────────────────
+geopandas
 folium
+ipyleaflet
+
+# ── misc ───────────────────────────────────────────────
+python-dotenv
