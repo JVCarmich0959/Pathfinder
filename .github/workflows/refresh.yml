@@ -1,14 +1,15 @@
 name: HDX nightly refresh
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:            # manual trigger button
   schedule:
-    - cron: '27 3 * * *'
+    - cron: '27 3 * * *'        # 03:27 UTC every day
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
 
+    # Connection string the loader will read
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathfinder
 
@@ -19,31 +20,23 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: pathfinder
-        ports: ['5432:5432']
+        ports:
+          - 5432:5432
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 10s --health-timeout 5s --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with: {python-version: '3.12'}
-
-      - name: Install system psql client
-        run: sudo apt-get update && sudo apt-get -y install postgresql-client
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: Install Python dependencies
         run: pip install -r requirements.txt
-
-      - name: Initialise schema (staging + clean)
-        working-directory: ${{ github.workspace }}
-        env:
-          PGPASSWORD: postgres
-        run: |
-          set -e
-          psql --set ON_ERROR_STOP=1 -h localhost -U postgres -d pathfinder \
-               -f sql/02_staging_clean.sql
 
       - name: Fetch newest HDX workbook
         run: bash scripts/fetch_hdx_pv.sh
