@@ -39,5 +39,5 @@ jobs:
 
     - name: Run ETL loader
       env:
-       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathfinder
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathfinder
       run: python scratch/load_pv_monthly.py
