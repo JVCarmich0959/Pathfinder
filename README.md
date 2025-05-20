@@ -24,6 +24,8 @@ layers (GeoJSON, MBTiles, printable PDFs) for refugees, local drivers,
 # clone & spin up complete stack
 git clone https://github.com/JVCarmichael0959/pathfinder.git
 cd pathfinder
+# copy .env template and fill in ACLED credentials
+cp .env.example .env
 docker compose up      # PostGIS + pgRouting + Jupyter + Flask
 
 ## Data ingest (raw ➜ PostGIS)
