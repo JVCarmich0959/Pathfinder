@@ -8,12 +8,26 @@ def road_counts_by_type(engine=None):
     return pd.read_sql(sql, engine)
 
 def monthly_events(iso, engine=None):
+    """Return monthly event counts and fatalities for one country ISO code."""
     if engine is None:
         engine = get_engine()
-    sql = f"""
-        SELECT year, month, events, fatalities
-        FROM sa_monthly_violence
-        WHERE iso = {iso}
-        ORDER BY year, month
-    """
+    sql = (
+        "SELECT year, month, events, fatalities "
+        "FROM sa_monthly_violence "
+        "WHERE iso = %(iso)s "
+        "ORDER BY year, month"
+    )
+    return pd.read_sql(sql, engine, params={"iso": iso})
+
+
+def monthly_totals(engine=None):
+    """Aggregate events and fatalities for each month across all countries."""
+    if engine is None:
+        engine = get_engine()
+    sql = (
+        "SELECT month_start, SUM(events) AS events, SUM(fatalities) AS fatalities "
+        "FROM acled_monthly_raw "
+        "GROUP BY month_start "
+        "ORDER BY month_start"
+    )
     return pd.read_sql(sql, engine)

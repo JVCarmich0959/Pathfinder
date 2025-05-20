@@ -9,5 +9,8 @@ geopandas
 folium
 ipyleaflet
 
+# plotting
+matplotlib
+
 # ── misc ───────────────────────────────────────────────
 python-dotenv
