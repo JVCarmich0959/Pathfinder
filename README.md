@@ -26,7 +26,11 @@ git clone https://github.com/JVCarmichael0959/pathfinder.git
 cd pathfinder
 # copy .env template and fill in ACLED credentials
 cp .env.example .env
-docker compose up      # PostGIS + pgRouting + Jupyter + Flask
+# start the stack (PostGIS + pgRouting + Jupyter)
+docker compose up
+
+# or run the helper script
+bash scripts/setup_dev_env.sh
 
 ## Data ingest (raw ➜ PostGIS)
 
