@@ -1,0 +1,40 @@
+name: Deploy dashboard
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: streamlit run dashboard/app.py --server.headless true &
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST: db
+          POSTGRES_DB: pathfinder
+      - run: |
+          sleep 15
+          mkdir site
+          wget -O site/index.html http://localhost:8501
+        timeout-minutes: 2
+      - uses: actions/upload-pages-artifact@v1
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/configure-pages@v3
+      - uses: actions/deploy-pages@v1
