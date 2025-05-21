@@ -44,6 +44,15 @@ bash scripts/setup_dev_env.sh
 | `sql/03_geo_join.sql` | Materialised view of events within 5 km of primary roads | `psql -f sql/03_geo_join.sql` |
 | `sql/04_last12months_view.sql` | Materialised view of the last 12 months metrics | `psql -f sql/04_last12months_view.sql` |
 
+## Dashboard
+
+Run a small Streamlit app showing the last 12 months of ACLED data:
+
+```bash
+streamlit run dashboard/app.py
+```
+
+
 These scripts write raw files to **`data/raw/`** and populate the corresponding PostGIS tables inside the `db` container (`events_raw`, `sa_monthly_violence`, `sudan_roads_osm`).
 
 
