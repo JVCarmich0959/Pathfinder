@@ -4,6 +4,12 @@ import math
 import pandas as pd
 from sqlalchemy import text
 
+try:
+    from ortools.constraint_solver import pywrapcp, routing_enums_pb2
+    _ORTOOLS_AVAILABLE = True
+except Exception:  # pragma: no cover - optional dep
+    _ORTOOLS_AVAILABLE = False
+
 from .db import get_engine
 
 
@@ -70,8 +76,37 @@ def nearest_neighbor(mat, start=0):
     return order
 
 
-def plan_route(limit=50, alpha=1.0, engine=None):
+def ortools_tsp(mat):
+    """Solve TSP using Google OR-Tools if available."""
+    if not _ORTOOLS_AVAILABLE:
+        return nearest_neighbor(mat)
+
+    n = len(mat)
+    routing = pywrapcp.RoutingModel(n, 1, 0)
+    search = pywrapcp.DefaultRoutingSearchParameters()
+    search.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
+
+    def cb(i, j):
+        return int(mat[i][j] * 1000)
+
+    routing.SetArcCostEvaluatorOfAllVehicles(cb)
+    assignment = routing.SolveWithParameters(search)
+    if assignment:
+        index = routing.Start(0)
+        order = []
+        while not routing.IsEnd(index):
+            order.append(routing.IndexToNode(index))
+            index = assignment.Value(routing.NextVar(index))
+        return order
+    return nearest_neighbor(mat)
+
+
+def plan_route(limit=50, alpha=1.0, engine=None, method="auto"):
+    """Return an ordered dataframe of road segments for a route."""
     df = fetch_road_risk(limit=limit, engine=engine)
     mat = distance_matrix(df, alpha=alpha)
-    order = nearest_neighbor(mat)
+    if method == "ortools" or (method == "auto" and _ORTOOLS_AVAILABLE):
+        order = ortools_tsp(mat)
+    else:
+        order = nearest_neighbor(mat)
     return df.iloc[order].assign(order=range(len(order)))
