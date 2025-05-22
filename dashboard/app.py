@@ -1,8 +1,11 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
 from pathfinder.db import get_engine
 
 st.set_page_config(page_title="ACLED Last 12 Months", layout="wide")
+
+MONTHS_MAX = 12
 
 @st.cache_data
 def load_data():
@@ -18,20 +21,38 @@ if df.empty:
     st.error("No data returned from database")
     st.stop()
 
+# ── Sidebar filters ──────────────────────────────────────────────
+st.sidebar.header("Filters")
+months = st.sidebar.slider("Months to show", 3, MONTHS_MAX, MONTHS_MAX)
+admin1_opts = ["All"] + sorted(df["admin1"].dropna().unique().tolist())
+admin1 = st.sidebar.selectbox("Admin1 region", admin1_opts)
+
+end_date = df["month_start"].max()
+start_date = end_date - pd.DateOffset(months=months - 1)
+filtered = df[df["month_start"] >= start_date]
+if admin1 != "All":
+    filtered = filtered[filtered["admin1"] == admin1]
+
 # Monthly totals line chart
-monthly = df.groupby('month_start')[['events','fatalities']].sum().reset_index()
+monthly = filtered.groupby('month_start')[['events','fatalities']].sum().reset_index()
 st.header("Monthly totals")
-st.line_chart(monthly.set_index('month_start'))
+source = monthly.melt('month_start', var_name='metric', value_name='count')
+line = alt.Chart(source).mark_line(point=True).encode(
+    x='month_start:T',
+    y='count:Q',
+    color='metric:N',
+    tooltip=['month_start','metric','count']
+).properties(height=300)
+st.altair_chart(line, use_container_width=True)
 
 # Heatmap of events by admin2 per month
 st.header("Events heatmap by admin2")
 heat = (
-    df.groupby(['admin2','month_start'])['events']
+    filtered.groupby(['admin2','month_start'])['events']
       .sum()
       .unstack(fill_value=0)
 )
 heat_data = heat.reset_index().melt('admin2', var_name='month', value_name='events')
-import altair as alt
 chart = alt.Chart(heat_data).mark_rect().encode(
     x='month:T',
     y=alt.Y('admin2:N', sort='-x'),
@@ -43,7 +64,7 @@ st.altair_chart(chart, use_container_width=True)
 # Top N risky admin2
 N = st.slider('Top N admin2 areas by events', 5, 20, 10)
 top_admin2 = (
-    df.groupby('admin2')['events']
+    filtered.groupby('admin2')['events']
       .sum()
       .sort_values(ascending=False)
       .head(N)

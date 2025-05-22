@@ -52,6 +52,10 @@ Run a small Streamlit app showing the last 12 months of ACLED data:
 streamlit run dashboard/app.py
 ```
 
+The dashboard now includes sidebar filters for the number of months to
+display and for selecting a specific **Admin1** region. Charts update
+automatically based on your selections.
+
 
 These scripts write raw files to **`data/raw/`** and populate the corresponding PostGIS tables inside the `db` container (`events_raw`, `sa_monthly_violence`, `sudan_roads_osm`).
 
