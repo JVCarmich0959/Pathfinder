@@ -61,6 +61,13 @@ streamlit run dashboard/app.py
 
 The sidebar lets you pick how many months to display and filter by **Admin1** region. Charts update automatically.
 
+## Risk modelling & routing
+
+Run `scripts/update_risk_layers.py` to rebuild Bayesian road risk scores. Use
+`scripts/export_routes.py` to generate a suggested route based on these scores
+(OR‑Tools is used if available). `scripts/validate_risk.py` prints a simple RMSE
+metric comparing predictions to the most recent month of events.
+
 ## Data license
 
 * **OpenStreetMap layers** © OpenStreetMap contributors, released under the Open Database License (ODbL) v1.0.
