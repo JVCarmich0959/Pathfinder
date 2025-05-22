@@ -22,11 +22,11 @@ layers (GeoJSON, MBTiles, printable PDFs) for refugees, local drivers,
 
 ```bash
 # clone & spin up complete stack
-git clone https://github.com/JVCarmichael0959/pathfinder.git
-cd pathfinder
+git clone <repo-url>
+cd Pathfinder
 # copy .env template and fill in ACLED credentials
 cp .env.example .env
-# start the stack (PostGIS + pgRouting + Jupyter)
+# start the stack (PostGIS + Jupyter)
 docker compose up
 
 # or run the helper script
@@ -39,6 +39,7 @@ bash scripts/setup_dev_env.sh
 | `scripts/pull_acled.py` | Pull ACLED events for one or more countries/regions (14-day window by default) | `python scripts/pull_acled.py Sudan Chad` |
 | `scripts/fetch_hdx_sa_monthly.py` | South-Africa monthly aggregates (events & fatalities) → CSV + PostGIS | `python scripts/fetch_hdx_sa_monthly.py "<HDX-xlsx-URL>"` |
 | `scripts/fetch_hdx_sudan_roads.py` | HOT-OSM Sudan roads export (ZIP) → GPKG + PostGIS | `python scripts/fetch_hdx_sudan_roads.py "<roads-zip-URL>"` |
+| `scripts/fetch_hdx_pv.sh` | Download Sudan political-violence data from HDX | `bash scripts/fetch_hdx_pv.sh` |
 | `scripts/enrich_admin2.py` | Load admin boundaries and enrich monthly events | `python scripts/enrich_admin2.py` |
 | `scripts/plot_monthly_totals.py` | Plot events & fatalities from PostGIS into `output.png` | `python scripts/plot_monthly_totals.py` |
 | `sql/03_geo_join.sql` | Materialised view of events within 5 km of primary roads | `psql -f sql/03_geo_join.sql` |
