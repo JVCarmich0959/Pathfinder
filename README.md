@@ -1,45 +1,51 @@
 # Pathfinder
 
-Risk-aware, offline-friendly maps and routing tools for Sudan–Chad
-humanitarian operations. Pathfinder fuses fresh satellite imagery,
-OpenStreetMap edits, and conflict-event data to publish daily safe-route
-layers (GeoJSON, MBTiles, printable PDFs) for refugees, local drivers,
+Risk-aware, offline-friendly mapping tools for humanitarian operations in the Sudan–Chad region. Pathfinder fuses fresh satellite imagery, recent OpenStreetMap edits and ACLED conflict data to produce daily safe-route layers (GeoJSON, MBTiles and printable PDFs).
 
+## Project goals
 
----
-## Data license
+* Provide up‑to‑date road safety information for refugees and local drivers.
+* Offer a simple repeatable data pipeline (ETL) that runs in Docker or CI.
+* Publish lightweight map packages and a small dashboard for rapid situational awareness.
 
-* **OpenStreetMap layers** © OpenStreetMap contributors, released under the
-  Open Database License (ODbL) v1.0.
-* **Conflict-event CSV (ACLED)** © ACLED. Free for non-commercial, attribution
-  required.
-* **Satellite imagery** © Planet Labs PBC (NICFI program). Redistribution of
-  raw imagery is prohibited; derived vector layers released as CC-BY-SA 4.0.
+## Repository layout
 
+```
+.
+├── dashboard/     # Streamlit app for exploring monthly event metrics
+├── data/          # raw downloads saved by the ETL scripts
+├── maps/          # HTML map prototypes and generated tiles
+├── notebooks/     # Jupyter notebooks for analysis and prototyping
+├── pathfinder/    # tiny Python package with DB utilities and queries
+├── scripts/       # command line tools for pulling + loading data
+├── scratch/       # experimental loaders / one‑off helpers
+├── sql/           # PostGIS SQL for cleaning and summarising tables
+└── docker-compose.yml  # local PostGIS + Jupyter stack
+```
 
+Raw files live under **`data/raw/`** and the ETL scripts populate the PostGIS database running in the `db` container. The main tables are `events_raw`, `sa_monthly_violence` and `sudan_roads_osm`.
 
-## Quick start (tech)
+## Quick start
 
 ```bash
-# clone & spin up complete stack
+# clone & start the stack
 git clone <repo-url>
 cd Pathfinder
-# copy .env template and fill in ACLED credentials
-cp .env.example .env
-# start the stack (PostGIS + Jupyter)
-docker compose up
+cp .env.example .env   # fill in your ACLED credentials
+docker compose up      # brings up PostGIS and Jupyter
 
-# or run the helper script
+# alternatively, use the helper script
 bash scripts/setup_dev_env.sh
+```
 
-## Data ingest (raw ➜ PostGIS)
+### Data ingest
 
 | script | purpose | example call |
 |--------|---------|--------------|
-| `scripts/pull_acled.py` | Pull ACLED events for one or more countries/regions (14-day window by default) | `python scripts/pull_acled.py Sudan Chad` |
+| `scripts/pull_acled.py` | Pull ACLED events for one or more countries/regions (14‑day window by default) | `python scripts/pull_acled.py Sudan Chad` |
 | `scripts/fetch_hdx_sa_monthly.py` | South-Africa monthly aggregates (events & fatalities) → CSV + PostGIS | `python scripts/fetch_hdx_sa_monthly.py "<HDX-xlsx-URL>"` |
-| `scripts/fetch_hdx_sudan_roads.py` | HOT-OSM Sudan roads export (ZIP) → GPKG + PostGIS | `python scripts/fetch_hdx_sudan_roads.py "<roads-zip-URL>"` |
-| `scripts/fetch_hdx_pv.sh` | Download Sudan political-violence data from HDX | `bash scripts/fetch_hdx_pv.sh` |
+| `scripts/fetch_hdx_sudan_roads.py` | HOT‑OSM Sudan roads export (ZIP) → GPKG + PostGIS | `python scripts/fetch_hdx_sudan_roads.py "<roads-zip-URL>"` |
+| `scripts/fetch_hdx_pv.sh` | Download Sudan political‑violence data from HDX | `bash scripts/fetch_hdx_pv.sh` |
 | `scripts/enrich_admin2.py` | Load admin boundaries and enrich monthly events | `python scripts/enrich_admin2.py` |
 | `scripts/plot_monthly_totals.py` | Plot events & fatalities from PostGIS into `output.png` | `python scripts/plot_monthly_totals.py` |
 | `sql/03_geo_join.sql` | Materialised view of events within 5 km of primary roads | `psql -f sql/03_geo_join.sql` |
@@ -47,17 +53,16 @@ bash scripts/setup_dev_env.sh
 
 ## Dashboard
 
-Run a small Streamlit app showing the last 12 months of ACLED data:
+Run the Streamlit dashboard showing the last twelve months of ACLED data:
 
 ```bash
 streamlit run dashboard/app.py
 ```
 
-The dashboard now includes sidebar filters for the number of months to
-display and for selecting a specific **Admin1** region. Charts update
-automatically based on your selections.
+The sidebar lets you pick how many months to display and filter by **Admin1** region. Charts update automatically.
 
+## Data license
 
-These scripts write raw files to **`data/raw/`** and populate the corresponding PostGIS tables inside the `db` container (`events_raw`, `sa_monthly_violence`, `sudan_roads_osm`).
-
-
+* **OpenStreetMap layers** © OpenStreetMap contributors, released under the Open Database License (ODbL) v1.0.
+* **Conflict‑event CSV (ACLED)** © ACLED. Free for non‑commercial use; attribution required.
+* **Satellite imagery** © Planet Labs PBC (NICFI program). Redistribution of raw imagery is prohibited; derived vector layers released as CC‑BY‑SA 4.0.
