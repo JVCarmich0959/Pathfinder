@@ -8,6 +8,12 @@ Risk-aware, offline-friendly mapping tools for humanitarian operations in the Su
 * Offer a simple repeatable data pipeline (ETL) that runs in Docker or CI.
 * Publish lightweight map packages and a small dashboard for rapid situational awareness.
 
+## Event Visualization
+
+Animated visualization showing geolocated ACLED events color-coded by event type:
+
+![Sudan Events Animation](assets/sudan_events_colored.gif)
+
 ## Repository layout
 
 ```
