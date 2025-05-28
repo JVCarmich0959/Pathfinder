@@ -7,6 +7,17 @@ __all__ = [
 ]
 __version__ = "0.1.0"
 
-from .db import get_engine
-from .risk_tsp import plan_route
-from .bayesian import admin_event_rates, road_segment_risk, update_risk_table
+try:  # optional dependencies may be missing during tests
+    from .db import get_engine
+except Exception:  # pragma: no cover
+    get_engine = None
+
+try:
+    from .risk_tsp import plan_route
+except Exception:  # pragma: no cover
+    plan_route = None
+
+try:
+    from .bayesian import admin_event_rates, road_segment_risk, update_risk_table
+except Exception:  # pragma: no cover
+    admin_event_rates = road_segment_risk = update_risk_table = None
