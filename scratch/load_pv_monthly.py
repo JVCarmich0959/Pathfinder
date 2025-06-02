@@ -5,45 +5,53 @@ Self-contained: creates missing tables every run, works in Docker or CI.
 """
 
 from pathlib import Path
-import os, itertools, pandas as pd
-import sqlalchemy as sa
+import itertools
+import argparse
+import pandas as pd
+from pathfinder.settings import DATA_RAW, engine
 
 # ────────────────────────────────────────────────────────────────
 # 0.  Paths & database URL
 # ────────────────────────────────────────────────────────────────
-ROOT = Path(__file__).resolve().parents[1]          # …/Pathfinder
-RAW_DIR = ROOT / "data" / "raw"
+ROOT = Path(__file__).resolve().parents[1]
+RAW_DIR = DATA_RAW
 
-DB_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@db:5432/pathfinder",  # docker-compose default
-)
-print("📡  DB_URL =", DB_URL)
+print("📡  DB_URL =", engine().url)
 
-engine = sa.create_engine(DB_URL)
+# ------------------------------------------------------------------ CLI
+parser = argparse.ArgumentParser(description="Load HDX monthly workbook")
+parser.add_argument("--src", help="Path to CSV/XLSX file", default=None)
+args = parser.parse_args()
 
 # ────────────────────────────────────────────────────────────────
 # 1.  Locate newest workbook
 # ────────────────────────────────────────────────────────────────
-candidates = list(itertools.chain(
-    RAW_DIR.glob("sudan*_pv_*xlsx"),
-    RAW_DIR.glob("sudan_hrp_*violence*xlsx"),
-))
-if not candidates:
-    raise FileNotFoundError(f"No Sudan HDX workbook found in {RAW_DIR}")
-
-wb_path = max(candidates, key=lambda p: p.stat().st_mtime)
+if args.src:
+    wb_path = Path(args.src)
+    if not wb_path.exists():
+        raise FileNotFoundError(f"File not found: {wb_path}")
+else:
+    candidates = sorted(DATA_RAW.glob("*monthly*"))
+    if not candidates:
+        raise FileNotFoundError(
+            f"No monthly HDX file found in {DATA_RAW}."
+            " Run scripts/fetch_hdx_pv.sh first."
+        )
+    wb_path = candidates[-1]
 print("👉  reading", wb_path.relative_to(ROOT))
 
 # ────────────────────────────────────────────────────────────────
 # 2.  Read the sheet that contains a 'Month' column
 # ────────────────────────────────────────────────────────────────
-for sheet in pd.ExcelFile(wb_path).sheet_names:
-    df = pd.read_excel(wb_path, sheet_name=sheet, dtype=str)
-    if "Month" in df.columns:
-        break
+if wb_path.suffix.lower().endswith("csv"):
+    df = pd.read_csv(wb_path, dtype=str)
 else:
-    raise ValueError("No sheet with a 'Month' column found!")
+    for sheet in pd.ExcelFile(wb_path).sheet_names:
+        df = pd.read_excel(wb_path, sheet_name=sheet, dtype=str)
+        if "Month" in df.columns:
+            break
+    else:
+        raise ValueError("No sheet with a 'Month' column found!")
 
 # ────────────────────────────────────────────────────────────────
 # 3.  Tidy dataframe
@@ -62,7 +70,7 @@ print(df.head())
 # ────────────────────────────────────────────────────────────────
 # 4.  Insert / replace raw table  (must come *before* DDL below)
 # ────────────────────────────────────────────────────────────────
-df.to_sql("acled_monthly_raw", engine,
+df.to_sql("acled_monthly_raw", engine(),
           if_exists="replace", index=False, method="multi")
 print(f"✅  inserted {len(df):,} rows into acled_monthly_raw")
 
@@ -70,7 +78,7 @@ print(f"✅  inserted {len(df):,} rows into acled_monthly_raw")
 # 5.  Ensure staging & clean tables exist (DDL runs after raw exists)
 # ────────────────────────────────────────────────────────────────
 ddl_sql = (ROOT / "sql" / "02_staging_clean.sql").read_text()
-with engine.begin() as conn:
+with engine().begin() as conn:
     conn.exec_driver_sql(ddl_sql)
 print("🔑  ensured staging & clean tables exist")
 
@@ -103,7 +111,7 @@ ON CONFLICT DO NOTHING;
 DELETE FROM acled_monthly_staging
 WHERE _loaded_at < NOW() - INTERVAL '30 days';
 """
-with engine.begin() as conn:
+with engine().begin() as conn:
     conn.exec_driver_sql(UPSERT_SQL)
 
 print("🎉  staging→clean sync complete")

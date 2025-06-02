@@ -1,13 +1,19 @@
 # scratch/map_roads.py
-import geopandas as gpd, folium
-from sqlalchemy import create_engine
+import geopandas as gpd
+import folium
+from pathfinder.settings import engine
 
-engine = create_engine("postgresql://postgres:postgres@db:5432/pathfinder")
+HIWAYS = ["primary"]
 
 def main():
+    sql = (
+        "SELECT geom, highway FROM sudan_roads_osm "
+        "WHERE highway = ANY(%(hiways)s::text[]) LIMIT 1000"
+    )
     roads = gpd.read_postgis(
-        "SELECT geom, highway FROM sudan_roads_osm WHERE highway = 'primary' LIMIT 1000",
-        con=engine,
+        sql,
+        con=engine(),
+        params={"hiways": HIWAYS},
         geom_col="geom",
         crs=4326,
     )

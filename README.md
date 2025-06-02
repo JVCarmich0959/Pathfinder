@@ -43,6 +43,11 @@ docker compose up      # brings up PostGIS and Jupyter
 
 # alternatively, use the helper script
 bash scripts/setup_dev_env.sh
+
+# first-run helpers
+python scripts/bootstrap_roads.py
+python scratch/load_pv_monthly.py
+streamlit run dashboard/app.py
 ```
 
 ### Running tests
@@ -61,7 +66,9 @@ pytest
 | `scripts/pull_acled.py` | Pull ACLED events for one or more countries/regions (14‑day window by default) | `python scripts/pull_acled.py Sudan Chad` |
 | `scripts/fetch_hdx_sa_monthly.py` | South-Africa monthly aggregates (events & fatalities) → CSV + PostGIS | `python scripts/fetch_hdx_sa_monthly.py "<HDX-xlsx-URL>"` |
 | `scripts/fetch_hdx_sudan_roads.py` | HOT‑OSM Sudan roads export (ZIP) → GPKG + PostGIS | `python scripts/fetch_hdx_sudan_roads.py "<roads-zip-URL>"` |
+| `scripts/bootstrap_roads.py` | Create base road tables if missing | `python scripts/bootstrap_roads.py` |
 | `scripts/fetch_hdx_pv.sh` | Download Sudan political‑violence data from HDX | `bash scripts/fetch_hdx_pv.sh` |
+| `scratch/load_pv_monthly.py` | Ingest monthly Sudan violence workbook | `python scratch/load_pv_monthly.py` |
 | `scripts/enrich_admin2.py` | Load admin boundaries and enrich monthly events | `python scripts/enrich_admin2.py` |
 | `scripts/plot_monthly_totals.py` | Plot events & fatalities from PostGIS into `output.png` | `python scripts/plot_monthly_totals.py` |
 | `sql/03_geo_join.sql` | Materialised view of events within 5 km of primary roads | `psql -f sql/03_geo_join.sql` |
