@@ -1,18 +1,15 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=65", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "pathfinder"
 version = "0.1.0"
-description = "Risk-aware mapping tools for humanitarian operations"
+description = "Conflict-navigation tools (Sudan ACLED, roads, dashboards)"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"          # optional: bump to your real env
 license = {text = "MIT"}
-authors = [{name = "Unknown", email = ""}]
-
-[project.urls]
-Homepage = "https://example.com"
+authors = [{name = "J. V. Carmichael", email = "jacquelynvictoriacarmichael@gmail.com"}]
 
 [tool.setuptools.packages.find]
 where = ["."]
