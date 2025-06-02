@@ -4,3 +4,7 @@ data/raw/*.zip
 data/raw/*.gpkg
 data/raw/*.xlsx
 .env
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
