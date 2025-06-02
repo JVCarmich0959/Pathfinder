@@ -37,11 +37,21 @@ Raw files live under **`data/raw/`** and the ETL scripts populate the PostGIS da
 # clone & start the stack
 git clone <repo-url>
 cd Pathfinder
+pip install -e .    # install the package for local tests
 cp .env.example .env   # fill in your ACLED credentials
 docker compose up      # brings up PostGIS and Jupyter
 
 # alternatively, use the helper script
 bash scripts/setup_dev_env.sh
+```
+
+### Running tests
+
+Install the package locally and run pytest:
+
+```bash
+pip install -e .
+pytest
 ```
 
 ### Data ingest
