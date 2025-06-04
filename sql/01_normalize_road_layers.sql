@@ -17,6 +17,9 @@ BEGIN
     END IF;
 END $$;
 
+-- Drop dependent materialized view to allow column type change
+DROP MATERIALIZED VIEW IF EXISTS events_near_primary_roads;
+
 -- 3) set SRID and correct type
 ALTER TABLE sudan_roads_osm
   ALTER COLUMN geom
@@ -44,3 +47,20 @@ CREATE INDEX IF NOT EXISTS idx_sudan_roads_simpl_geom
 -- 6) planner stats
 ANALYZE sudan_roads_osm;
 ANALYZE sudan_roads_osm_simplified;
+
+-- Recreate dependent view after column alteration
+DROP MATERIALIZED VIEW IF EXISTS events_near_primary_roads;
+CREATE MATERIALIZED VIEW events_near_primary_roads AS
+SELECT r.id       AS road_id,
+       e.event_id AS event_id,
+       e.event_date,
+       ST_Distance(e.geom::geography, r.geom::geography) AS distance_m,
+       e.geom AS event_geom,
+       r.geom AS road_geom
+FROM   events_raw e
+JOIN   sudan_roads_osm r
+       ON r.highway = 'primary'
+      AND ST_DWithin(e.geom::geography, r.geom::geography, 5000);
+
+CREATE INDEX IF NOT EXISTS events_near_primary_roads_geom_idx
+    ON events_near_primary_roads USING GIST (event_geom);
