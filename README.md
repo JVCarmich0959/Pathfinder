@@ -1,12 +1,50 @@
 # Pathfinder
 
-Risk-aware, offline-friendly mapping tools for humanitarian operations in the Sudan–Chad region. Pathfinder fuses fresh satellite imagery, recent OpenStreetMap edits and ACLED conflict data to produce daily safe-route layers (GeoJSON, MBTiles and printable PDFs).
+## Overview
+
+Pathfinder provides risk-aware, offline-friendly mapping tools for humanitarian work in the Sudan–Chad region by blending satellite imagery, recent OpenStreetMap road data, and ACLED conflict feeds to produce daily safe-route layers along with printable products. The quick-start guide below covers installing the Python package, configuring ACLED credentials, bringing up the Docker stack, and launching first-run helpers that load baseline datasets and the Streamlit dashboard.
 
 ## Project goals
 
 * Provide up‑to‑date road safety information for refugees and local drivers.
 * Offer a simple repeatable data pipeline (ETL) that runs in Docker or CI.
 * Publish lightweight map packages and a small dashboard for rapid situational awareness.
+
+## Key components
+
+### Python package (`pathfinder/`)
+
+* `db.get_engine()` centralizes SQLAlchemy connection management, prioritizing a `DATABASE_URL` override while defaulting to Postgres credentials used by the Docker stack.
+* `bayesian.py` implements a Gamma-Poisson model for estimating event rates per admin2, joining those predictions back onto primary roads and writing refreshed risk scores into PostGIS tables.
+* `risk_tsp.py` assembles risk-weighted distance matrices, offers both a greedy nearest-neighbor heuristic and an optional OR-Tools solver, and returns ordered road itineraries to support safer routing decisions.
+* `queries.py` contains higher-level Pandas/SQL helpers such as monthly totals aggregation and road type counts that are reused by plotting scripts and notebooks.
+* Supporting utilities include cached engine access (`settings.py`) and standardized logging configuration used across ETL scripts.
+
+### ETL & automation
+
+* `pathfinder/etl/pull_acled.py` authenticates against the ACLED API, caches ISO codes, builds queries for both individual countries and regional aliases, saves raw CSV snapshots, and writes refreshed event data into PostGIS, exiting with helpful error handling when input validation or network calls fail.
+* `pathfinder/etl/enrich_admin2.py` ensures PostGIS extensions are enabled, loads shapefiles via `ogr2ogr`, and joins geographic admin boundaries onto monthly ACLED aggregates, rebuilding indexes for spatial queries.
+* Thin wrapper scripts in `scripts/` orchestrate workflows: e.g., `update_risk_layers.py` recalculates road risk tables, `export_routes.py` renders planned routes in Folium (optionally exporting to PDF if WeasyPrint is installed), and CLI entry points expose ETL modules directly.
+* The ingest table below summarises additional helpers for HDX data pulls, bootstrap loading, plotting, and SQL materialized views, showing how the project assembles its data lake and analytics outputs.
+
+### Dashboard & visualization
+
+* `dashboard/app.py` is a Streamlit application that caches PostGIS queries for the last 12 months, provides sidebar filters for month count and Admin1 region, displays key metrics, Altair line charts and heatmaps, and lets analysts download filtered CSVs for follow-up work.
+* Command-line script `plot_monthly_totals.py` offers a quick matplotlib PNG export of events and fatalities using the shared `monthly_totals` query.
+
+### Infrastructure & dependencies
+
+* `docker-compose.yml` provisions a PostGIS database and a Jupyter notebook container wired together, passing ACLED credentials via a `.env` file and mounting the repository for reproducible analysis environments.
+* `pyproject.toml` defines the installable package metadata, while `requirements.txt` captures optional extras for geospatial processing, optimization, dashboarding, and PDF export, making the stack flexible for local development versus CI usage.
+
+### Quality & testing
+
+* Lightweight unit tests verify key math utilities: the Haversine implementation, the distance matrix/nearest-neighbor heuristic, and the Bayesian event rate calculator, ensuring core algorithms behave as expected before integrating with heavier data pulls.
+* The quick-start steps direct contributors to install the package in editable mode and run `pytest`, aligning with the scripted helpers for end-to-end validation.
+
+### Working with the project
+
+A typical workflow involves launching the Docker stack, pulling fresh ACLED and HDX data via the provided scripts, enriching spatial tables, recomputing Bayesian risk layers, and then exploring situational awareness through the Streamlit dashboard or exported maps. The modular package design and command-line wrappers make it straightforward to automate updates in CI/CD or rerun analyses offline, while the tests and logging utilities help diagnose data quality or connectivity issues quickly.
 
 ## Event Visualization
 
