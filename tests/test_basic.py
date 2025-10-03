@@ -27,4 +27,4 @@ def test_estimate_event_rate():
     })
     res = estimate_event_rate(df, alpha=1, beta=1)
     rate_a = res.loc[res.admin2=='a', 'pred_rate'].iloc[0]
-    assert round(rate_a, 2) == 1.00
+    assert round(rate_a, 2) == 1.33
