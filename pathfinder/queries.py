@@ -13,7 +13,7 @@ def monthly_events(iso, engine=None):
         engine = get_engine()
     sql = (
         "SELECT year, month, events, fatalities "
-        "FROM sa_monthly_violence "
+        "FROM sudan_monthly_violence "
         "WHERE iso = %(iso)s "
         "ORDER BY year, month"
     )
