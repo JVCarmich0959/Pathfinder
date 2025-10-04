@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import re
+from pathlib import Path
 from typing import Iterable, Optional
 
 import pandas as pd
@@ -18,6 +19,7 @@ logger = setup_logging(__name__)
 DEFAULT_SOURCE_TABLE = "events_raw"
 DEFAULT_DEST_TABLE = "sa_monthly_violence"
 TMP_TABLE = "_sa_monthly_violence_tmp"
+REQUIRED_EVENT_COLUMNS = {"iso", "event_date"}
 
 IDENTIFIER_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -73,6 +75,23 @@ def ensure_table_exists(engine: Engine, table_name: str) -> None:
     inspector = inspect(engine)
     if not inspector.has_table(table, schema=schema):
         raise RuntimeError(f"Required table '{table_name}' is missing")
+
+
+def load_events_from_csv(csv_path: str | Path) -> pd.DataFrame:
+    """Load events from a CSV snapshot for offline dry-runs."""
+
+    path = Path(csv_path)
+    if not path.exists():
+        raise FileNotFoundError(f"CSV snapshot {path} does not exist")
+
+    logger.info("Reading events from CSV snapshot %s", path)
+    events = pd.read_csv(path)
+    missing = REQUIRED_EVENT_COLUMNS - set(events.columns)
+    if missing:
+        raise ValueError(
+            "CSV snapshot is missing required columns: %s" % ", ".join(sorted(missing))
+        )
+    return events
 
 
 def fetch_events(engine: Engine, source_table: str) -> pd.DataFrame:
@@ -203,6 +222,11 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
         help="Optional SQLAlchemy database URL; falls back to get_engine()",
     )
     parser.add_argument(
+        "--source-csv",
+        default=None,
+        help="Optional CSV snapshot path for offline aggregation; overrides --source-table",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Compute aggregates without writing to PostGIS",
@@ -211,15 +235,22 @@ def main(argv: Optional[Iterable[str]] = None) -> None:
 
     source_table = validate_identifier(args.source_table)
     destination_table = validate_identifier(args.destination_table)
-    engine = sa.create_engine(args.database_url) if args.database_url else get_engine()
+    engine: Engine | None = None
 
-    ensure_table_exists(engine, source_table)
-    events = fetch_events(engine, source_table)
+    if args.source_csv:
+        events = load_events_from_csv(args.source_csv)
+    else:
+        engine = sa.create_engine(args.database_url) if args.database_url else get_engine()
+        ensure_table_exists(engine, source_table)
+        events = fetch_events(engine, source_table)
     monthly = aggregate_events_dataframe(events)
 
     if args.dry_run:
         logger.info("Dry run requested; first rows:\n%s", monthly.head())
         return
+
+    if engine is None:
+        engine = sa.create_engine(args.database_url) if args.database_url else get_engine()
 
     write_monthly_table(engine, monthly, destination_table=destination_table)
 
