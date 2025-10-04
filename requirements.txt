@@ -20,6 +20,8 @@ matplotlib
 
 # ── misc ───────────────────────────────────────────────
 python-dotenv
+# HTTP + APIs
+requests>=2.31
 # --- dashboard ---
 streamlit
 altair

@@ -67,7 +67,7 @@ Animated visualization showing geolocated ACLED events color-coded by event type
 └── docker-compose.yml  # local PostGIS + Jupyter stack
 ```
 
-Raw files live under **`data/raw/`** and the ETL scripts populate the PostGIS database running in the `db` container. The main tables are `events_raw`, `sa_monthly_violence` and `sudan_roads_osm`.
+Raw files live under **`data/raw/`** and the ETL scripts populate the PostGIS database running in the `db` container. The main tables are `events_raw`, `sudan_monthly_violence` and `sudan_roads_osm`.
 
 ## Quick start
 
@@ -102,7 +102,7 @@ pytest
 | script | purpose | example call |
 |--------|---------|--------------|
 | `scripts/pull_acled.py` | Pull ACLED events for one or more countries/regions (14‑day window by default) | `python scripts/pull_acled.py Sudan Chad` |
-| `scripts/fetch_hdx_sa_monthly.py` | South-Africa monthly aggregates (events & fatalities) → CSV + PostGIS | `python scripts/fetch_hdx_sa_monthly.py "<HDX-xlsx-URL>"` |
+| `scripts/fetch_hdx_sudan_admin2.py` | Sudan Admin2 monthly aggregates (events & fatalities) via HDX API | `python scripts/fetch_hdx_sudan_admin2.py` |
 | `scripts/fetch_hdx_sudan_roads.py` | HOT‑OSM Sudan roads export (ZIP) → GPKG + PostGIS | `python scripts/fetch_hdx_sudan_roads.py "<roads-zip-URL>"` |
 | `scripts/bootstrap_roads.py` | Create base road tables if missing | `python scripts/bootstrap_roads.py` |
 | `scripts/fetch_hdx_pv.sh` | Download Sudan political‑violence data from HDX | `bash scripts/fetch_hdx_pv.sh` |
