@@ -6,6 +6,7 @@ from pathfinder.db import get_engine
 st.set_page_config(page_title="ACLED Last 12 Months", layout="wide")
 
 MONTHS_MAX = 12
+STALE_DAYS = 45
 
 @st.cache_data
 def load_data():
@@ -54,6 +55,16 @@ if df.empty:
     st.error("No data returned from database")
     st.stop()
 
+# Data recency + coverage checks
+last_month = df["month_start"].max()
+first_month = df["month_start"].min()
+st.caption(f"Data coverage: {first_month.date()} → {last_month.date()}")
+if (pd.Timestamp.utcnow() - last_month) > pd.Timedelta(days=STALE_DAYS):
+    st.warning(
+        "Data appears stale. Last month available is "
+        f"{last_month.date()} (>{STALE_DAYS} days ago)."
+    )
+
 # ── Sidebar filters ──────────────────────────────────────────────
 st.sidebar.header("Filters")
 months = st.sidebar.slider("Months to show", 3, MONTHS_MAX, MONTHS_MAX)
@@ -65,6 +76,10 @@ start_date = end_date - pd.DateOffset(months=months - 1)
 filtered = df[df["month_start"] >= start_date]
 if admin1 != "All":
     filtered = filtered[filtered["admin1"] == admin1]
+
+if filtered["admin2"].isna().any():
+    missing = int(filtered["admin2"].isna().sum())
+    st.warning(f"{missing} rows missing admin2; they are excluded from rankings and heatmaps.")
 
 # ── Key metrics ──────────────────────────────────────────────────
 totals = filtered[["events", "fatalities"]].sum()

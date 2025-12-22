@@ -24,37 +24,53 @@ def haversine(lon1, lat1, lon2, lat2):
 
 
 def fetch_road_risk(limit=50, engine=None):
-    """Return road segments with event counts and midpoints."""
+    """Return road segments with risk stats and midpoints.
+
+    Prefers the computed road_risk_scores table (mean/intervals). Falls back to
+    event counts near roads if the risk table is absent.
+    """
     if engine is None:
         engine = get_engine()
     sql = text(
         """
+        WITH rr AS (
+            SELECT road_id, risk_mean, risk_upper
+            FROM road_risk_scores
+        )
         SELECT r.id AS road_id,
-               COALESCE(COUNT(e.event_id), 0) AS events,
                ST_X(ST_LineInterpolatePoint(r.geom, 0.5)) AS lon,
                ST_Y(ST_LineInterpolatePoint(r.geom, 0.5)) AS lat,
-               ST_Length(r.geom::geography) AS length_m
+               ST_Length(r.geom::geography) AS length_m,
+               COALESCE(rr.risk_mean, COALESCE(COUNT(e.event_id), 0) / NULLIF(ST_Length(r.geom::geography),0)) AS risk_mean,
+               COALESCE(rr.risk_upper, COALESCE(COUNT(e.event_id), 0) / NULLIF(ST_Length(r.geom::geography),0)) AS risk_upper
         FROM sudan_roads_osm r
+        LEFT JOIN rr ON rr.road_id = r.id
         LEFT JOIN events_near_primary_roads e ON e.road_id = r.id
         WHERE r.highway = 'primary'
-        GROUP BY r.id, r.geom
+        GROUP BY r.id, r.geom, rr.risk_mean, rr.risk_upper
         ORDER BY r.id
         LIMIT :lim
         """
     )
     df = pd.read_sql(sql, engine, params={"lim": limit})
-    df["risk"] = df["events"] / df["length_m"].replace({0: 1})
+    df["risk_upper"] = df["risk_upper"].fillna(df["risk_mean"])
     return df
 
 
 def distance_matrix(df, alpha=1.0):
-    """Weighted distance matrix for road midpoints."""
+    """Weighted distance matrix for road midpoints.
+
+    alpha controls the weight of risk relative to distance. It uses an
+    uncertainty-aware risk proxy (upper bound) to remain conservative.
+    """
     n = len(df)
     mat = [[0.0] * n for _ in range(n)]
     for i in range(n):
         for j in range(i + 1, n):
             d = haversine(df.lon[i], df.lat[i], df.lon[j], df.lat[j])
-            d *= 1 + alpha * (df.risk[i] + df.risk[j]) / 2
+            risk_i = df.risk_upper[i]
+            risk_j = df.risk_upper[j]
+            d *= 1 + alpha * (risk_i + risk_j) / 2
             mat[i][j] = mat[j][i] = d
     return mat
 
