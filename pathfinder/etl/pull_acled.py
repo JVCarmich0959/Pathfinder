@@ -23,6 +23,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 
 from ..utils.logging import setup_logging
+from .validation import (
+    run_validation,
+    write_report,
+    quarantine_file,
+    SEVERITY_ERROR,
+)
 
 # ---------------------------------------------------------------------------
 # logging
@@ -33,8 +39,12 @@ logger = setup_logging(__name__)
 # constants
 # ---------------------------------------------------------------------------
 ISO_CACHE = Path("data/meta/iso_cache.csv")
+VALIDATION_LOG = Path("data/meta/ingest_validation.csv")
+QUARANTINE_DIR = Path("data/quarantine")
 DEFAULT_DB_URL = "postgresql://postgres:postgres@db:5432/pathfinder"
 DAYS_BACK = 14
+RETRIES = 3
+RETRY_DELAY = 5
 
 # region aliases (add more if desired)
 REGION_ALIASES: Dict[str, int] = {
@@ -103,33 +113,36 @@ def build_queries(items: Iterable[str], lookup: Dict[str, str], aliases: Dict[st
 
 def fetch_acled(token: str, email: str, iso_query: str, region_query: str,
                 days_back: int = DAYS_BACK) -> pd.DataFrame:
-    """Fetch ACLED events within ``days_back`` days."""
+    """Fetch ACLED events within ``days_back`` days with simple retries."""
     today = dt.date.today()
     start_date = today - dt.timedelta(days=days_back)
     url = (
         "https://api.acleddata.com/acled/read?"
         f"email={email}&key={token}"
         f"{iso_query}{region_query}"
-        f"&event_date={start_date}|{today}"  # DEBUG TIP: If this fails, check the ACLED_TOKEN in your .env file
+        f"&event_date={start_date}|{today}"
         "&limit=20000&format=json"
     )
-    try:
-        logger.info("Fetching ACLED: %s", url)
-        resp = requests.get(url, timeout=60)
-        resp.raise_for_status()
-        js = resp.json()
-        rows = js.get("data", [])
-        if not rows:
-            raise ValueError("Query succeeded but returned zero rows")
-        df = pd.DataFrame(rows)
-        logger.debug("Fetched %d rows", len(df))
-        return df
-    except RequestException as exc:
-        logger.error("ACLED request failed: %s", exc)
-        raise
-    except ValueError as exc:
-        logger.error("ACLED response error: %s", exc)
-        raise
+    last_err: Exception | None = None
+    for attempt in range(1, RETRIES + 1):
+        try:
+            logger.info("Fetching ACLED (attempt %d/%d): %s", attempt, RETRIES, url)
+            resp = requests.get(url, timeout=60)
+            resp.raise_for_status()
+            js = resp.json()
+            rows = js.get("data", [])
+            if not rows:
+                raise ValueError("Query succeeded but returned zero rows")
+            df = pd.DataFrame(rows)
+            logger.debug("Fetched %d rows", len(df))
+            return df
+        except (RequestException, ValueError) as exc:
+            last_err = exc
+            logger.error("ACLED request failed (attempt %d/%d): %s", attempt, RETRIES, exc)
+            if attempt < RETRIES:
+                time.sleep(RETRY_DELAY)
+    assert last_err is not None  # for mypy
+    raise last_err
 
 
 def save_csv(df: pd.DataFrame, countries: Iterable[str]) -> Path:
@@ -202,7 +215,28 @@ def main(argv: Iterable[str] | None = None) -> None:
             logger.error("Unrecognised names: %s", missing)
             sys.exit(1)
         df = fetch_acled(token, email, iso_q, region_q)
-        save_csv(df, args)
+
+        # Validation: required columns + date window + duplicates on event_id
+        today = dt.date.today()
+        report = run_validation(
+            df,
+            source="acled",
+            required_columns=["event_id", "event_date", "country", "iso", "admin1", "admin2"],
+            date_column="event_date",
+            start=today - dt.timedelta(days=DAYS_BACK + 2),
+            end=today,
+            duplicate_subset=["event_id"],
+            missing_columns_warn=["fatalities", "longitude", "latitude"],
+        )
+
+        csv_path = save_csv(df, args)
+        write_report(report, VALIDATION_LOG)
+
+        if not report.ok:
+            quarantined = quarantine_file(csv_path, QUARANTINE_DIR)
+            logger.error("Validation failed; file moved to quarantine: %s", quarantined)
+            sys.exit(1)
+
         write_postgis(df)
     except Exception as exc:
         logger.error("Script failed: %s", exc)

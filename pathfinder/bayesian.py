@@ -1,6 +1,7 @@
 """Simple Bayesian risk model utilities."""
 
 from __future__ import annotations
+
 import pandas as pd
 from sqlalchemy import text
 
@@ -21,16 +22,22 @@ def fetch_admin_monthly(engine=None):
 
 
 def estimate_event_rate(df: pd.DataFrame, alpha: float = 1.0, beta: float = 1.0) -> pd.DataFrame:
-    """Estimate monthly event rate per admin2 using a Gamma-Poisson model."""
+    """Estimate monthly event rate per admin2 using a Gamma-Poisson model with uncertainty."""
     grouped = (
         df.groupby("admin2")
         ["events"]
         .agg(months="count", total_events="sum")
         .reset_index()
     )
-    grouped["pred_rate"] = (alpha + grouped["total_events"]) / (
-        beta + grouped["months"]
-    )
+    shape = alpha + grouped["total_events"]
+    rate = beta + grouped["months"]
+    grouped["pred_rate_mean"] = shape / rate
+    # Normal approximation to Gamma for light dependency footprint
+    variance = shape / (rate ** 2)
+    std = variance.pow(0.5)
+    z = 1.96  # ~95% interval
+    grouped["pred_rate_lower"] = (grouped["pred_rate_mean"] - z * std).clip(lower=0)
+    grouped["pred_rate_upper"] = grouped["pred_rate_mean"] + z * std
     return grouped
 
 
@@ -57,8 +64,18 @@ def road_segment_risk(engine=None, alpha: float = 1.0, beta: float = 1.0):
         """
     )
     df = pd.read_sql(sql, engine)
-    df = df.merge(rates[["admin2", "pred_rate"]], on="admin2", how="left")
-    df["risk"] = df["pred_rate"].fillna(0) / df["length_m"].replace({0: 1})
+    df = df.merge(
+        rates[["admin2", "pred_rate_mean", "pred_rate_lower", "pred_rate_upper"]],
+        on="admin2",
+        how="left",
+    )
+    denom = df["length_m"].replace({0: 1})
+    for col, out_col in [
+        ("pred_rate_mean", "risk_mean"),
+        ("pred_rate_lower", "risk_lower"),
+        ("pred_rate_upper", "risk_upper"),
+    ]:
+        df[out_col] = df[col].fillna(0) / denom
     return df
 
 
@@ -67,6 +84,6 @@ def update_risk_table(engine=None, alpha: float = 1.0, beta: float = 1.0):
     df = road_segment_risk(engine=engine, alpha=alpha, beta=beta)
     if engine is None:
         engine = get_engine()
-    df[["road_id", "risk"]].to_sql(
+    df[["road_id", "risk_mean", "risk_lower", "risk_upper"]].to_sql(
         "road_risk_scores", engine, if_exists="replace", index=False
     )

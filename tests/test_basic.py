@@ -12,7 +12,8 @@ def test_distance_matrix_and_nn():
     df = pd.DataFrame({
         'lon': [0, 0.1, 0.2],
         'lat': [0, 0.1, 0.2],
-        'risk': [0, 0, 0],
+        'risk_mean': [0, 0, 0],
+        'risk_upper': [0, 0, 0],
     })
     mat = distance_matrix(df)
     order = nearest_neighbor(mat)
@@ -26,5 +27,6 @@ def test_estimate_event_rate():
         'events': [2, 1, 0],
     })
     res = estimate_event_rate(df, alpha=1, beta=1)
-    rate_a = res.loc[res.admin2=='a', 'pred_rate'].iloc[0]
+    rate_a = res.loc[res.admin2=='a', 'pred_rate_mean'].iloc[0]
     assert round(rate_a, 2) == 1.33
+    assert {'pred_rate_lower', 'pred_rate_upper'} <= set(res.columns)
